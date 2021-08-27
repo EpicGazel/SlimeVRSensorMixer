@@ -28,7 +28,7 @@ data_android = rotation
 data_ipod = accel
 data_ipod.append(gyro) #appended as order goes accel then gyro in packets
 android_rot_quat = rotation
-
+rotate_vector = [0, 0, 0]
 
 #packets struct types, > is for endiness of data, most significant digit's placement
 hs = struct.Struct (">i Q") #handshake
@@ -129,15 +129,27 @@ try:
                     
                 #print(f"Degrees:{data_android_degrees}")
                 
+                
                 #Convert Euler data to Quaternion
-                android_rot_euler = Rotation.from_euler('xyz', data_android_degrees, degrees=True)
+                #XYZ not xyz as the rotations are intrinsic (sensors move with device) not extrinsic (global reference point), I think?
+                android_rot_euler = Rotation.from_euler('XYZ', data_android_degrees, degrees=True) 
+                #print(f"Before Rotation: {android_rot_euler.as_matrix()}")
+                #print(f"From Normal: {Rotation.from_euler('XYZ', data_android, degrees=False).as_matrix()}")
+                #android_rot_euler_rotated = Rotation.from_euler(android_rot_euler.apply(rotate_vector))
+                #print(android_rot_euler.apply(rotate_vector))
+                #temp1 = android_rot_euler.apply(rotate_vector)
+                #temp2 = Rotation.from_rotvec(temp1)
+                #temp3 = temp2.as_euler("XYZ")
+                #print(f"After Rotation: {temp3.as_matrix()}")
+                
+                
                 android_rot_quat = android_rot_euler.as_quat()
                 
                 #android_rot_vec = Rotation.from_rotvec(data_android)
                 #android_rot_quat = android_rot_vec.as_quat()
                 
-                #print(f"Rotation: {data_android[0]:.3f}   {data_android[1]:.3f}   {data_android[2]:.3f}")
-            except KeyboardInterrupt: #Android app sends empty data sometimes. This catches that error.
+                # print(f"Rotation: {data_android[0]:.3f}   {data_android[1]:.3f}   {data_android[2]:.3f}")
+            except ValueError: #Android app sends empty data sometimes. This catches that error.
                 print("ValueError")
                 pass
         
@@ -146,7 +158,8 @@ try:
         
         #Send android rotation data to SlimeVR Server (port 6969)
         #try:
-        packet_data = (packet_type["rotation"], packet_id, android_rot_quat[0], android_rot_quat[1], android_rot_quat[2], android_rot_quat[3]) 
+        #multiplying the y (android_rot_quat[1]) here by -1 to flip it seems to make the game rotation sensor somewhat accurate
+        packet_data = (packet_type["rotation"], packet_id, android_rot_quat[0], (android_rot_quat[1]), android_rot_quat[2], android_rot_quat[3]) 
         packet = s2.pack(*packet_data)
         sock.sendall(packet)
         packet_id += 1
@@ -154,7 +167,7 @@ try:
         #print(f"data_android:{data_android[0]:.3f}|{data_android[1]:.3f}|{data_android[2]:.3f}")
         #print(f"euler:{android_rot_euler}")
         #print(f"rot_vec:{android_rot_vec}")
-        print(f"quat:{android_rot_quat[0]:.3f}|{android_rot_quat[1]:.3f}|{android_rot_quat[2]:.3f}|{android_rot_quat[3]:.3f}")
+        #print(f"quat:{android_rot_quat[0]:.3f}|{android_rot_quat[1]:.3f}|{android_rot_quat[2]:.3f}|{android_rot_quat[3]:.3f}")
         #except NameError:
         #    print("Rotation data skipped: NameError")
         #    pass
@@ -168,7 +181,7 @@ except KeyboardInterrupt:
     pass
 
 finally:
-    #print(f"min_max: {min_max}")
+    # print(f"min_max: {min_max}")
     receiver.shutdown
     receiver.close()
     sock.shutdown
